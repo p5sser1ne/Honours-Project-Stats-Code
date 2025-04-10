@@ -1,0 +1,59 @@
+library(lme4)
+library(readxl)
+library(sjPlot)
+library(ggeffects)
+library(tidyverse)
+library(ggplot2)
+library(multcomp)
+library(emmeans)
+
+rm(list=ls())
+
+data <- read_excel(file.choose())
+
+#Linear Mixed Effects Model (for percentage data)
+
+model <- lmer(`PercentageData` ~ MaternalInfection + PupSex + Experiment + PupSex:MaternalInfection + Experiment:MaternalInfection +  (1|MaternalID), data = data)
+
+#log10 transformation of data is not fitting well
+model <- lmer(log10(`Percentage Data`) ~ MaternalInfection + PupSex + Experiment + PupSex:MaternalInfection + Experiment:MaternalInfection + (1|MaternalID), data = data)
+
+#Checking of the datas fit to the model
+  #Creates graphs showing distribution of data
+  tdat <- data.frame(predicted=predict(model), residual = residuals(model))
+  ggplot(tdat,aes(x=residual)) + geom_histogram(bins=20, color="black")
+  
+  #Creates figure showing model fit
+  DHARMa::simulateResiduals(model, plot=T)
+  
+  #Creates graphs showing residuals
+  emm <- predict_response(model, terms = c("MaternalInfection", "PupSex"))
+  plot(emm, show_data = T, jitter = .1)
+
+#general summary of model
+summary(model)
+
+#runs type III Anova to find significance of main effects treatment
+anova(model)
+
+#interrogates interactions between the main effect and other fixed effects
+emm_s.t <- emmeans(model, pairwise ~ MaternalInfection | PupSex)
+emm_s.t
+
+
+#Generalized linear mixed effects modes for negative binomial distributions (for count data)
+model <- glmer.nb(CountData ~ MaternalInfection + PupSex + Experiment + (1|MaternalID), data = data)
+
+#Creates figure showing model fit
+tdat <- data.frame(predicted=predict(model), residual = residuals(model))
+ggplot(tdat,aes(x=residual)) + geom_histogram(bins=20, color="black")
+
+#Creates figure showing model fit
+DHARMa::simulateResiduals(model, plot=T)
+
+#Creates graphs showing residuals
+emm <- predict_response(model, terms = c("MaternalInfection", "PupSex"))
+plot(emm, show_data = T, jitter = .1)
+
+#Runs type II Wals Chi Square Test
+car::Anova(model)
